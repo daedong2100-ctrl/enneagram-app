@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd Downloads/enneagram-app/enneagram-app && npm install --include=dev && npm run build",
+  "outputDirectory": "Downloads/enneagram-app/enneagram-app/dist",
+  "framework": null
+}
