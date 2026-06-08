@@ -8,7 +8,7 @@ import { TypeResult, EnneagramType, UserInfo } from '../types';
 import { typeInfo } from '../data/typeInfo';
 import { MAX_SCORE } from '../utils/calculateResult';
 import { deepAnalysisData } from '../data/deepAnalysis';
-import { sendResultEmail } from '../utils/sendEmail';
+import { generateDocxBlob, downloadDocx } from '../utils/generateDocx';
 
 interface ResultScreenProps {
   result: TypeResult;
@@ -45,18 +45,35 @@ const Card: React.FC<{ children: React.ReactNode; accent?: string }> = ({ childr
 const ResultScreen: React.FC<ResultScreenProps> = ({ result, userInfo, onRetake }) => {
   const [activeTab, setActiveTab] = useState<'overview'|'deep'|'chart'|'growth'>('overview');
   const [emailStatus, setEmailStatus] = useState<'idle'|'sending'|'success'|'error'>('idle');
+  const [docxStatus, setDocxStatus] = useState<'idle'|'generating'|'done'|'error'>('idle');
   const info = typeInfo[result.type];
   const deep = deepAnalysisData[result.type];
   const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
   const genderLabel = userInfo.gender === 'male' ? '남성' : userInfo.gender === 'female' ? '여성' : '기타';
 
-  // 결과 화면 진입 시 자동 이메일 발송
+  // 결과 화면 진입 시 자동 이메일 발송 (Word 첨부)
   useEffect(() => {
     setEmailStatus('sending');
-    sendResultEmail(userInfo, result).then(ok => {
-      setEmailStatus(ok ? 'success' : 'error');
-    });
+    fetch('/api/send-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userInfo, result }),
+    })
+      .then(r => r.ok ? setEmailStatus('success') : setEmailStatus('error'))
+      .catch(() => setEmailStatus('error'));
   }, []);
+
+  const handleDownloadDocx = async () => {
+    setDocxStatus('generating');
+    try {
+      const blob = await generateDocxBlob(userInfo, result);
+      const typeName = info.name;
+      downloadDocx(blob, `에니어그램_${result.type}번_${typeName}_${userInfo.name}.docx`);
+      setDocxStatus('done');
+    } catch {
+      setDocxStatus('error');
+    }
+  };
 
   const barData = [...result.scores].sort((a,b)=>a.type-b.type).map(s=>({
     label:`${s.type}`, score: s.score, type: s.type,
@@ -98,17 +115,30 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ result, userInfo, onRetake 
                 <span className="font-mono text-xs text-obsidian-500 ml-2">{userInfo.age}세 · {genderLabel}</span>
               </div>
             </div>
-            {/* 이메일 발송 상태 */}
-            <div className="flex items-center gap-1.5">
+            {/* 이메일 발송 상태 + Word 다운로드 버튼 */}
+            <div className="flex items-center gap-3">
               {emailStatus === 'sending' && (
-                <span className="font-mono text-xs text-obsidian-400 animate-pulse">📧 결과 전송 중...</span>
+                <span className="font-mono text-xs text-obsidian-400 animate-pulse">📧 전송 중...</span>
               )}
               {emailStatus === 'success' && (
-                <span className="font-mono text-xs" style={{ color:'#6B9E8B' }}>📧 결과 전송 완료 ✓</span>
+                <span className="font-mono text-xs" style={{ color:'#6B9E8B' }}>📧 전송 완료 ✓</span>
               )}
               {emailStatus === 'error' && (
                 <span className="font-mono text-xs text-obsidian-500">📧 전송 대기</span>
               )}
+              <button
+                onClick={handleDownloadDocx}
+                disabled={docxStatus === 'generating'}
+                className="px-3 py-1 rounded-lg font-mono text-xs transition-all duration-200"
+                style={{
+                  background: docxStatus === 'done' ? 'rgba(107,158,139,0.2)' : `${info.color}20`,
+                  border: `1px solid ${docxStatus === 'done' ? 'rgba(107,158,139,0.5)' : info.color + '50'}`,
+                  color: docxStatus === 'done' ? '#6B9E8B' : info.color,
+                  opacity: docxStatus === 'generating' ? 0.6 : 1,
+                }}
+              >
+                {docxStatus === 'generating' ? '⏳ 생성 중...' : docxStatus === 'done' ? '✓ Word 저장됨' : '📄 Word 다운로드'}
+              </button>
             </div>
           </div>
           <div className="px-6 py-6">

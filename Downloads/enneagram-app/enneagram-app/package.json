@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "docx": "^9.7.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "recharts": "^2.10.0"
+    "recharts": "^2.10.0",
+    "resend": "^6.12.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
